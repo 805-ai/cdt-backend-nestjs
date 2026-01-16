@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cdt-backend
+  labels:
+    app: cdt-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cdt-backend
+  template:
+    metadata:
+      labels:
+        app: cdt-backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/adeelirshad512/cdt-backend-core:staging
+          imagePullPolicy: Always  
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: cdt-env

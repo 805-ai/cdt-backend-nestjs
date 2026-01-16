@@ -1,0 +1,145 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Verify Repository
+        run: |
+          echo "Repository verified: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref }}"
+          ls -la
+  build:
+    name: Build
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: ghcr.io/adeelirshad512/cdt-backend-core:staging
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+          
+      - name: Build Docker Image
+        run: docker build -t $IMAGE_NAME .
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: ghcr.io/adeelirshad512/cdt-backend-core:staging
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+          
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t $IMAGE_NAME .
+          docker push $IMAGE_NAME
+
+  configure:
+    name: Configure
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Set up Kubeconfig
+        run: |
+          echo "${{ vars.STAGING_KUBECONFIG }}" > kubeconfig
+          kubectl --kubeconfig=kubeconfig get nodes
+        shell: bash
+        
+      - name: Create or update cdt-env secret
+        run: |
+          kubectl --kubeconfig=kubeconfig create secret generic cdt-env \
+            --from-literal=ENV_STAGING="${{ vars.STAGING_ENV }}" \
+            --dry-run=client -o yaml | kubectl --kubeconfig=kubeconfig apply -f -
+
+  deploy:
+    name: Deploy
+    needs: configure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Set up Kubeconfig
+        run: |
+          echo "${{ vars.STAGING_KUBECONFIG }}" > kubeconfig
+          
+      - name: Deploy to K3s
+        run: |
+          kubectl --kubeconfig=kubeconfig apply -f k8s/staging/
+          
+      - name: Add imagePullSecrets to deployment
+        run: |
+          kubectl --kubeconfig=kubeconfig patch deployment cdt-backend \
+            --patch '{"spec": {"template": {"spec": {"imagePullSecrets": [{"name": "ghcr-secret"}]}}}}'
+
+  restart:
+    name: Restart
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Kubeconfig
+        run: |
+          echo "${{ vars.STAGING_KUBECONFIG }}" > kubeconfig
+          
+      - name: Rollout Restart the Deployment
+        run: |
+          kubectl --kubeconfig=kubeconfig rollout restart deployment cdt-backend
+
+  verify:
+    name: Verify
+    needs: restart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Kubeconfig
+        run: |
+          echo "${{ vars.STAGING_KUBECONFIG }}" > kubeconfig
+          
+      - name: Check Deployment Status
+        run: |
+          # Wait for deployment to be ready
+          kubectl --kubeconfig=kubeconfig rollout status deployment/cdt-backend --timeout=180s
+          
+      - name: Verify Pods are Running
+        run: |
+          # Check if pods are running
+          PODS_RUNNING=$(kubectl --kubeconfig=kubeconfig get pods -l app=cdt-backend -o jsonpath='{.items[*].status.phase}' | grep -c "Running" || echo "0")
+          if [ "$PODS_RUNNING" -eq "0" ]; then
+            echo "No pods are running! Deployment may have failed."
+            kubectl --kubeconfig=kubeconfig get pods -l app=cdt-backend
+            exit 1
+          else
+            echo "✅ $PODS_RUNNING pod(s) are running successfully!"
+          fi
+          
+      - name: Record Deployment
+        run: |
+          echo "✅ Deployment to staging completed successfully on $(date)"

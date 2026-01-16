@@ -1,0 +1,15 @@
+export enum Role {
+  OWNER = 'OWNER',
+  ADMIN = 'ADMIN',
+  USER = 'USER',
+  PARTNER = 'PARTNER',
+  AUDITOR = 'AUDITOR',
+}
+
+export enum UserStatus {
+  PENDING = 'PENDING',
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  ARCHIVED = 'ARCHIVED',
+  DEACTIVATED = 'DEACTIVATED',
+}

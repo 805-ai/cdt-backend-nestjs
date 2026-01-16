@@ -1,0 +1,41 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { MongooseModule } from '@nestjs/mongoose';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { AuditModule } from './audit/audit.module';
+import { AuthModule } from './auth/auth.module';
+import { MONGODB_URI_LOCAL } from './common/config/secrets';
+import { ResultInterceptor } from './common/interceptors/result.interceptor';
+import { SharedAuthModule } from './common/shared/shared.module';
+import { ConsentModule } from './consent/consent.module';
+import { CredentialModule } from './credential/credential.module';
+import { PartnerModule } from './partner/partner.module';
+import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { UserModule } from './user/user.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    MongooseModule.forRoot(MONGODB_URI_LOCAL),
+    UserModule,
+    AuthModule,
+    CredentialModule,
+    AuditModule,
+    PartnerModule,
+    AuthModule,
+    RateLimitModule,
+    ConsentModule,
+    SharedAuthModule,
+  ],
+  controllers: [AppController],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResultInterceptor,
+    },
+  ],
+})
+export class AppModule {}

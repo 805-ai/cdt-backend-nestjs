@@ -1,0 +1,4 @@
+export enum CREDENTIAL_STATUS {
+  ACTIVE = 'ACTIVE',
+  REVOKED = 'REVOKED',
+}
