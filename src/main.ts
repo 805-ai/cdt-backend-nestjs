@@ -15,19 +15,20 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   let firebaseApp;
+  let firebaseEnabled = false;
   try {
     firebaseApp = initializeFirebaseAdmin();
     const isConnected = await verifyFirebaseConnection(firebaseApp);
-    if (!isConnected) {
-      throw new Error('Firebase Admin SDK connection verification failed');
+    if (isConnected) {
+      firebaseEnabled = true;
+      logger.log('Firebase Admin SDK connection established');
+      await createOwnerUserIfNotExists(logger);
+    } else {
+      logger.warn('Firebase verification failed - running in demo mode without auth');
     }
-    logger.log('Firebase Admin SDK connection established');
   } catch (error) {
-    logger.error(`Failed to establish Firebase Admin SDK connection: ${error.message}`, error.stack);
-    process.exit(1);
+    logger.warn(`Firebase unavailable - running in demo mode: ${error.message}`);
   }
-
-  await createOwnerUserIfNotExists(logger);
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableCors({

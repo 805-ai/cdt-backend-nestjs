@@ -149,3 +149,5 @@ CLAUDE.md
 firebase-client.json
 firebase-admin.json
 /context_*
+
+.vercel

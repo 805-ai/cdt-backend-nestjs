@@ -21,8 +21,7 @@ if (existsSync(envPath)) {
   logger.log(`Using ${envPath} file to supply config environment variables`);
   dotenv.config({ path: envPath });
 } else {
-  logger.error(`No environment configuration file found for NODE_ENV=${env}. Expected file: ${envPath}`);
-  process.exit(1);
+  logger.log(`No .env file found - using environment variables from platform`);
 }
 
 const requiredEnvVars = [
@@ -55,15 +54,13 @@ const requiredEnvVars = [
 
 const missingEnvVars = requiredEnvVars.filter((variable) => !process.env[variable]);
 if (missingEnvVars.length > 0) {
-  logger.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
-  process.exit(1);
+  logger.warn(`Missing environment variables (demo mode): ${missingEnvVars.join(', ')}`);
 }
 
 // Validate private key format
-const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
-if (!privateKey?.includes('-----BEGIN PRIVATE KEY-----') || !privateKey?.includes('-----END PRIVATE KEY-----')) {
-  logger.error('FIREBASE_ADMIN_PRIVATE_KEY is not properly formatted. Ensure it includes BEGIN and END markers.');
-  process.exit(1);
+const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n') || '';
+if (privateKey && !privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+  logger.warn('FIREBASE_ADMIN_PRIVATE_KEY may not be properly formatted');
 }
 
 // Export general configuration
